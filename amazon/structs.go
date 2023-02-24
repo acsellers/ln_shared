@@ -335,6 +335,7 @@ func CacheData(id string, pd ProductData) {
 
 func RetrieveASIN(id string) ProductData {
 	if cached, ok := cacheList[id]; ok {
+		fmt.Println("Cached: ", id)
 		f, _ := os.Open(cached)
 		pd := ProductData{}
 		err := json.NewDecoder(f).Decode(&pd)
@@ -364,6 +365,7 @@ func RetrieveASIN(id string) ProductData {
 }
 func RetrieveGTIN(id string) ProductData {
 	if cached, ok := cacheList[id]; ok {
+		fmt.Println("Cached: ", id)
 		f, _ := os.Open(cached)
 		pd := ProductData{}
 		err := json.NewDecoder(f).Decode(&pd)
