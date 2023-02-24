@@ -1,6 +1,20 @@
 package amazon
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+var (
+	RFAPIKey  = "REPLACE_ME"
+	cacheList = map[string]string{}
+)
 
 type ProductData struct {
 	RequestInfo struct {
@@ -288,4 +302,97 @@ func (pd ProductData) LookupVariant(titles ...string) (ProductVariant, bool) {
 		}
 	}
 	return ProductVariant{}, false
+}
+func init() {
+	cacheList = make(map[string]string)
+	folder := fmt.Sprintf("amazon/%s/", time.Now().Format("2006-01"))
+	matches, _ := filepath.Glob(folder + "/*.json")
+	for _, match := range matches {
+		id := strings.Replace(match, folder, "", 1)
+		id = strings.Replace(id, ".json", "", 1)
+		cacheList[id] = match
+	}
+}
+func CacheData(id string, pd ProductData) {
+	filename := fmt.Sprintf("amazon/%s/%s.json", time.Now().Format("2006-01"), id)
+	cacheList[id] = filename
+	f, err := os.Create(filename)
+	if err != nil {
+		log.Fatal("Create: ", err)
+	}
+	defer f.Close()
+	err = json.NewEncoder(f).Encode(pd)
+	if err != nil {
+		log.Fatal("Encode: ", err)
+	}
+}
+
+func RetrieveASIN(id string) ProductData {
+	if cached, ok := cacheList[id]; ok {
+		f, _ := os.Open(cached)
+		pd := ProductData{}
+		err := json.NewDecoder(f).Decode(&pd)
+		if err != nil {
+			fmt.Println("ID: ", id)
+			log.Fatal("Decode: ", err)
+		}
+		return pd
+	}
+	u := fmt.Sprintf(
+		"https://api.rainforestapi.com/request?api_key=%s&amazon_domain=amazon.com&asin=%s&type=product",
+		RFAPIKey,
+		id,
+	)
+	fmt.Println("Retrieving: ", id)
+	pd, err := Get(u)
+	if err != nil {
+		fmt.Println("ID: ", id)
+		log.Fatal("Get: ", err)
+	}
+	if pd.Product.Asin == "" {
+		fmt.Println("Not Found: ", id)
+		return ProductData{}
+	}
+	CacheData(id, pd)
+	return pd
+}
+func RetrieveGTIN(id string) ProductData {
+	if cached, ok := cacheList[id]; ok {
+		f, _ := os.Open(cached)
+		pd := ProductData{}
+		err := json.NewDecoder(f).Decode(&pd)
+		if err != nil {
+			fmt.Println("ID: ", id)
+			log.Fatal("Decode: ", err)
+		}
+		return pd
+	}
+	u := fmt.Sprintf(
+		"https://api.rainforestapi.com/request?api_key=%s&amazon_domain=amazon.com&type=product&gtin=%s",
+		RFAPIKey,
+		id,
+	)
+	fmt.Println("Retrieving: ", id)
+	pd, err := Get(u)
+	if err != nil {
+		fmt.Println("ID: ", id)
+		log.Fatal("Get: ", err)
+	}
+	if pd.Product.Asin == "" {
+		fmt.Println("Not Found: ", id)
+		return ProductData{}
+	}
+	CacheData(id, pd)
+	return pd
+}
+
+func Get(url string) (ProductData, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return ProductData{}, err
+	}
+	defer resp.Body.Close()
+	var pd ProductData
+	err = json.NewDecoder(resp.Body).Decode(&pd)
+	return pd, err
 }
