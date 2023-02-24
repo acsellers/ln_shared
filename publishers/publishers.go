@@ -1,6 +1,6 @@
 package publishers
 
-var PublisherFiles = []string{
+var Files = []string{
 	"cross-infinite/output.json",
 	"jnovel/output.json",
 	"kodansha/output.json",
