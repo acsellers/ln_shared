@@ -12,7 +12,13 @@ import (
 )
 
 var (
-	RFAPIKey  = "REPLACE_ME"
+	RFAPIKey = "REPLACE_ME"
+
+	PaperbackTypes = []string{"Paperback", "Mass Market Paperback", "Perfect Paperback", "Pocket Book"}
+	HardcoverTypes = []string{"Hardcover", "Leather Bound", "Library Binding", "Flexibound"}
+	DigitalTypes   = []string{"Kindle", "Kindle & Comixology", "Digital"}
+	AudiobookTypes = []string{"Audiobook", "Audible Audiobook", "Audio CD", "MP3 CD"}
+
 	cacheList = map[string]string{}
 )
 
