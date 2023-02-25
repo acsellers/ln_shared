@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,6 +21,7 @@ var (
 	AudiobookTypes = []string{"Audiobook", "Audible Audiobook", "Audio CD", "MP3 CD"}
 
 	cacheList = map[string]string{}
+	cacheMtx  sync.RWMutex
 )
 
 type ProductData struct {
@@ -318,24 +320,39 @@ func init() {
 		id = strings.Replace(id, ".json", "", 1)
 		cacheList[id] = match
 	}
+	f, _ := os.Open("amazon/missing.json")
+	missing := []string{}
+	json.NewDecoder(f).Decode(&missing)
+	f.Close()
+	for _, id := range missing {
+		cacheList[id] = "missing"
+	}
 }
 func CacheData(id string, pd ProductData) {
 	filename := fmt.Sprintf("amazon/%s/%s.json", time.Now().Format("2006-01"), id)
+	cacheMtx.Lock()
 	cacheList[id] = filename
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Fatal("Create: ", err)
 	}
-	defer f.Close()
+	f.Close()
 	err = json.NewEncoder(f).Encode(pd)
 	if err != nil {
 		log.Fatal("Encode: ", err)
 	}
+	f.Close()
+	cacheMtx.Unlock()
 }
 
 func RetrieveASIN(id string) ProductData {
+	cacheMtx.RLock()
 	if cached, ok := cacheList[id]; ok {
+		cacheMtx.RUnlock()
 		fmt.Println("Cached: ", id)
+		if cached == "missing" {
+			return ProductData{}
+		}
 		f, _ := os.Open(cached)
 		pd := ProductData{}
 		err := json.NewDecoder(f).Decode(&pd)
@@ -345,6 +362,8 @@ func RetrieveASIN(id string) ProductData {
 		}
 		return pd
 	}
+	cacheMtx.RUnlock()
+
 	u := fmt.Sprintf(
 		"https://api.rainforestapi.com/request?api_key=%s&amazon_domain=amazon.com&asin=%s&type=product",
 		RFAPIKey,
@@ -364,8 +383,13 @@ func RetrieveASIN(id string) ProductData {
 	return pd
 }
 func RetrieveGTIN(id string) ProductData {
+	cacheMtx.RLock()
 	if cached, ok := cacheList[id]; ok {
+		cacheMtx.RUnlock()
 		fmt.Println("Cached: ", id)
+		if cached == "missing" {
+			return ProductData{}
+		}
 		f, _ := os.Open(cached)
 		pd := ProductData{}
 		err := json.NewDecoder(f).Decode(&pd)
@@ -375,6 +399,8 @@ func RetrieveGTIN(id string) ProductData {
 		}
 		return pd
 	}
+	cacheMtx.RUnlock()
+
 	u := fmt.Sprintf(
 		"https://api.rainforestapi.com/request?api_key=%s&amazon_domain=amazon.com&type=product&gtin=%s",
 		RFAPIKey,
@@ -388,6 +414,7 @@ func RetrieveGTIN(id string) ProductData {
 	}
 	if pd.Product.Asin == "" {
 		fmt.Println("Not Found: ", id)
+		cacheList[id] = "missing"
 		return ProductData{}
 	}
 	CacheData(id, pd)
