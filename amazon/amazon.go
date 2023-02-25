@@ -328,6 +328,18 @@ func init() {
 		cacheList[id] = "missing"
 	}
 }
+func SaveMissing(id string) {
+	f, _ := os.Create(fmt.Sprintf("amazon/%s/missing.json", time.Now().Format("2006-01")))
+	missing := []string{}
+	for k, v := range cacheList {
+		if v == "missing" {
+			missing = append(missing, k)
+		}
+	}
+	json.NewEncoder(f).Encode(missing)
+	f.Close()
+}
+
 func CacheData(id string, pd ProductData) {
 	filename := fmt.Sprintf("amazon/%s/%s.json", time.Now().Format("2006-01"), id)
 	cacheMtx.Lock()
@@ -336,7 +348,7 @@ func CacheData(id string, pd ProductData) {
 	if err != nil {
 		log.Fatal("Create: ", err)
 	}
-	f.Close()
+
 	err = json.NewEncoder(f).Encode(pd)
 	if err != nil {
 		log.Fatal("Encode: ", err)
