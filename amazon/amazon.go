@@ -320,7 +320,7 @@ func init() {
 		id = strings.Replace(id, ".json", "", 1)
 		cacheList[id] = match
 	}
-	f, _ := os.Open("amazon/missing.json")
+	f, _ := os.Open(fmt.Sprintf("amazon/%s/missing.json", time.Now().Format("2006-01")))
 	missing := []string{}
 	json.NewDecoder(f).Decode(&missing)
 	f.Close()
@@ -329,6 +329,8 @@ func init() {
 	}
 }
 func SaveMissing(id string) {
+	cacheMtx.Lock()
+	cacheList[id] = "missing"
 	f, _ := os.Create(fmt.Sprintf("amazon/%s/missing.json", time.Now().Format("2006-01")))
 	missing := []string{}
 	for k, v := range cacheList {
@@ -338,6 +340,7 @@ func SaveMissing(id string) {
 	}
 	json.NewEncoder(f).Encode(missing)
 	f.Close()
+	cacheMtx.Unlock()
 }
 
 func CacheData(id string, pd ProductData) {
@@ -355,13 +358,16 @@ func CacheData(id string, pd ProductData) {
 	}
 	f.Close()
 	cacheMtx.Unlock()
+
+	if pd.Product.Asin != id {
+		CacheData(pd.Product.Asin, pd)
+	}
 }
 
 func RetrieveASIN(id string) ProductData {
 	cacheMtx.RLock()
 	if cached, ok := cacheList[id]; ok {
 		cacheMtx.RUnlock()
-		fmt.Println("Cached: ", id)
 		if cached == "missing" {
 			return ProductData{}
 		}
@@ -381,7 +387,6 @@ func RetrieveASIN(id string) ProductData {
 		RFAPIKey,
 		id,
 	)
-	fmt.Println("Retrieving: ", id)
 	pd, err := Get(u)
 	if err != nil {
 		fmt.Println("ID: ", id)
@@ -389,16 +394,18 @@ func RetrieveASIN(id string) ProductData {
 	}
 	if pd.Product.Asin == "" {
 		fmt.Println("Not Found: ", id)
+
+		SaveMissing(id)
 		return ProductData{}
 	}
 	CacheData(id, pd)
 	return pd
 }
 func RetrieveGTIN(id string) ProductData {
+	id = strings.TrimSpace(strings.ReplaceAll(id, "-", ""))
 	cacheMtx.RLock()
 	if cached, ok := cacheList[id]; ok {
 		cacheMtx.RUnlock()
-		fmt.Println("Cached: ", id)
 		if cached == "missing" {
 			return ProductData{}
 		}
@@ -413,12 +420,12 @@ func RetrieveGTIN(id string) ProductData {
 	}
 	cacheMtx.RUnlock()
 
+	fmt.Println("Not cached: ", id)
 	u := fmt.Sprintf(
 		"https://api.rainforestapi.com/request?api_key=%s&amazon_domain=amazon.com&type=product&gtin=%s",
 		RFAPIKey,
 		id,
 	)
-	fmt.Println("Retrieving: ", id)
 	pd, err := Get(u)
 	if err != nil {
 		fmt.Println("ID: ", id)
@@ -426,7 +433,7 @@ func RetrieveGTIN(id string) ProductData {
 	}
 	if pd.Product.Asin == "" {
 		fmt.Println("Not Found: ", id)
-		cacheList[id] = "missing"
+		SaveMissing(id)
 		return ProductData{}
 	}
 	CacheData(id, pd)
@@ -436,10 +443,19 @@ func RetrieveGTIN(id string) ProductData {
 func Get(url string) (ProductData, error) {
 	resp, err := http.Get(url)
 	if err != nil {
+		fmt.Println("Error: ", err)
 		return ProductData{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fmt.Println("Error: ", resp.StatusCode)
+		return ProductData{}, err
+	}
 	var pd ProductData
 	err = json.NewDecoder(resp.Body).Decode(&pd)
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return ProductData{}, err
+	}
 	return pd, err
 }
