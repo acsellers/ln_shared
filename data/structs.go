@@ -14,22 +14,22 @@ import (
 
 type Series struct {
 	ID                string                 `json:"id"`
-	Type              string                 `json:"type"` // novel manga
+	Type              string                 `json:"type"` // light-novel manga
 	Slug              string                 `json:"slug"`
 	Title             string                 `json:"title"`
 	OtherTitles       []string               `json:"other_titles"`
 	Authors           []string               `json:"author"`
 	Translators       []string               `json:"translators"`
+	Illustrators      []string               `json:"illustrators"`
 	Roles             map[string][]string    `json:"roles"`
 	AutoGenres        []string               `json:"auto_genres"`
 	PrimaryGenres     []string               `json:"primary_genres"`
 	MainGenres        []string               `json:"main_genres"`
 	Setting           []string               `json:"setting"`
 	Themes            []string               `json:"themes"`
-	MaturityLevel     string                 `json:"maturity_level"`
+	AgeLevel          []string               `json:"age_level"`
 	OtherGenres       []string               `json:"other_genres"`
 	Tags              []string               `json:"tags"`
-	Illustrators      []string               `json:"illustrators"`
 	Publisher         string                 `json:"publisher"`
 	Website           string                 `json:"website"`
 	Image             string                 `json:"image"`
@@ -40,19 +40,17 @@ type Series struct {
 	Universe          string                 `json:"universe"`
 	ParentSeries      string                 `json:"parent_series"`
 	ChildSeries       []string               `json:"child_series"`
-	SideSeries        bool                   `json:"side_series"`
 	Status            string                 `json:"status"` // Ongoing, Complete, Hiatus, Cancelled
 	AveragePopularity float64                `json:"average_popularity"`
 	Ranking           int                    `json:"ranking"`
 	OriginalLanguage  string                 `json:"original_language"`
 	VersionLanguage   string                 `json:"version_language"`
 	AnnounceDate      string                 `json:"announce_date"`
-	Grade             string                 `json:"grade"`
-	Extra             map[string]interface{} `json:"extra"`
+	Extra             map[string]interface{} `json:"extra,omitempty"`
 	Formats           []string               `json:"formats"`
 	Volumes           []Volume               `json:"volumes"`
-	NULink            string                 `json:"nu_link"`
-	NUTags            []string               `json:"nu_tags"`
+	NULink            string                 `json:"nu_link,omitempty"`
+	MDLink            string                 `json:"md_link,omitempty"`
 }
 
 type Volume struct {
@@ -60,33 +58,34 @@ type Volume struct {
 	SeriesInt    int                 `json:"series_int,omitempty"`
 	SeriesID     string              `json:"series_id"`
 	Series       string              `json:"series"` // Use slug
-	Title        string              `json:"title"`
-	Order        int                 `json:"order"`
-	Authors      []string            `json:"authors"`
-	Translators  []string            `json:"translators"`
-	Illustrators []string            `json:"illustrators"`
-	Roles        map[string][]string `json:"roles"`
+	Title        string              `json:"title" form:"title"`
+	Order        int                 `json:"order" form:"order"`
+	Authors      []string            `json:"authors,omitempty"`
+	Translators  []string            `json:"translators,omitempty"`
+	Illustrators []string            `json:"illustrators,omitempty"`
+	Roles        map[string][]string `json:"roles,omitempty"`
 	SideVolume   bool                `json:"side_story"`
-	CoverImage   string              `json:"cover_image"`
+	CoverImage   string              `json:"cover_image" form:"cover_image"`
 	WebImage     string              `json:"web_image"`
 	LocalImage   string              `json:"local_image"`
 	Thumbnail    string              `json:"thumbnail"`
-	Description  string              `json:"description"`
-	Website      string              `json:"website"`
-	AltWebsite   string              `json:"alt_website"`
+	Description  string              `json:"description" form:"description"`
+	Website      string              `json:"website" form:"website"`
+	AltWebsite   string              `json:"alt_website,omitempty" form:"alt_website"`
 	// Deprecated
-	Release string `json:"release"`
+	Release string `json:"release,omitempty"`
 	// When we can get a release date for each medium
 	DigitalRelease string `json:"digital_release"` // YYYY-MM-DD
 	PrintRelease   string `json:"print_release"`
 	// We can only get a single list of purchase links
 	PurchaseLinks []PurchaseLink `json:"purchase_links"`
+
 	// When we can get a list of purchase links for each medium
-	DigitalLinks []PurchaseLink `json:"digital_links"`
-	PrintLinks   []PurchaseLink `json:"print_links"`
+	DigitalLinks []PurchaseLink `json:"digital_links" form:"digital_links"`
+	PrintLinks   []PurchaseLink `json:"print_links" form:"print_links"`
 	Formats      []string       `json:"formats"`
-	DigitalISBN  string         `json:"digital_isbn"`
-	ISBN         string         `json:"isbn"`
+	DigitalISBN  string         `json:"digital_isbn" form:"digital_isbn"`
+	ISBN         string         `json:"isbn" form:"isbn"`
 	Amazon       AmazonData     `json:"amazon"`
 	Popularity   float64        `json:"popularity"`
 	Ranking      int            `json:"ranking"`
@@ -94,13 +93,13 @@ type Volume struct {
 	Extra map[string]interface{} `json:"extra,omitempty"`
 }
 type AmazonData struct {
-	PaperbackASIN  string  `json:"paperback_asin"`
+	PaperbackASIN  string  `json:"paperback_asin" form:"paperback_asin"`
 	PaperbackPrice float32 `json:"paperback_price"`
-	DigitalASIN    string  `json:"digital_asin"`
+	DigitalASIN    string  `json:"digital_asin" form:"digital_asin"`
 	DigitalPrice   float32 `json:"digital_price"`
-	HardcoverASIN  string  `json:"hardcover_asin"`
+	HardcoverASIN  string  `json:"hardcover_asin" form:"hardcover_asin"`
 	HardcoverPrice float32 `json:"hardcover_price"`
-	AudiobookASIN  string  `json:"audiobook_asin"`
+	AudiobookASIN  string  `json:"audiobook_asin" form:"audiobook_asin"`
 	AudiobookPrice float32 `json:"audiobook_price"`
 	BookRank       int     `json:"book_rank"`
 	PhysicalRank   int     `json:"physical_rank"`
@@ -332,8 +331,8 @@ func mergeSeries(existing *Series, updated Series, config MergeConfig) {
 	if existing.Themes == nil || len(existing.Themes) == 0 || config.SeriesOverride["Themes"] {
 		existing.Themes = updated.Themes
 	}
-	if existing.MaturityLevel == "" || len(existing.MaturityLevel) == 0 || config.SeriesOverride["MaturityLevel"] {
-		existing.MaturityLevel = updated.MaturityLevel
+	if len(existing.AgeLevel) == 0 || config.SeriesOverride["AgeLevel"] {
+		existing.AgeLevel = updated.AgeLevel
 	}
 	if existing.Tags == nil || len(existing.Tags) == 0 || config.SeriesOverride["Tags"] {
 		existing.Tags = updated.Tags
@@ -490,6 +489,12 @@ func NewPurchaseLink(link string) PurchaseLink {
 		pl.Vendor = "Comixology"
 	case strings.Contains(link, "penguinrandomhouse.com"):
 		pl.Vendor = "Penguin Random House"
+	case strings.Contains(link, "kinokuniya.com"):
+		pl.Vendor = "Kinokuniya"
+	case strings.Contains(link, "comicshoplocator.com"):
+		pl.Vendor = "Comic Shop Locator"
+	case strings.Contains(link, "kentai.com"):
+		pl.Vendor = "Kentai Comics"
 	default:
 		pl.Vendor = "Unknown"
 	}
