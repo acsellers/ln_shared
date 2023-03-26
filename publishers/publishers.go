@@ -10,5 +10,6 @@ var Files = []string{
 	"sevenseas/output.json",
 	"square-enix/output.json",
 	"tentai/output.json",
+	"viz/output.json",
 	"yenpress/output.json",
 }
