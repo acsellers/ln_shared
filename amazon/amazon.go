@@ -313,14 +313,14 @@ func (pd ProductData) LookupVariant(titles ...string) (ProductVariant, bool) {
 }
 func init() {
 	cacheList = make(map[string]string)
-	folder := fmt.Sprintf("amazon/%s/", time.Now().Format("2006-01"))
+	folder := "amazon/current/"
 	matches, _ := filepath.Glob(folder + "/*.json")
 	for _, match := range matches {
 		id := strings.Replace(match, folder, "", 1)
 		id = strings.Replace(id, ".json", "", 1)
 		cacheList[id] = match
 	}
-	f, _ := os.Open(fmt.Sprintf("amazon/%s/missing.json", time.Now().Format("2006-01")))
+	f, _ := os.Open("amazon/current/missing.json")
 	missing := []string{}
 	json.NewDecoder(f).Decode(&missing)
 	f.Close()
@@ -331,7 +331,21 @@ func init() {
 func SaveMissing(id string) {
 	cacheMtx.Lock()
 	cacheList[id] = "missing"
-	f, _ := os.Create(fmt.Sprintf("amazon/%s/missing.json", time.Now().Format("2006-01")))
+	f, _ := os.Create("amazon/current/missing.json")
+	missing := []string{}
+	for k, v := range cacheList {
+		if v == "missing" {
+			missing = append(missing, k)
+		}
+	}
+	json.NewEncoder(f).Encode(missing)
+	f.Close()
+	cacheMtx.Unlock()
+}
+func DropMissing(id string) {
+	cacheMtx.Lock()
+	delete(cacheList, id)
+	f, _ := os.Create("amazon/current/missing.json")
 	missing := []string{}
 	for k, v := range cacheList {
 		if v == "missing" {
@@ -344,7 +358,7 @@ func SaveMissing(id string) {
 }
 
 func CacheData(id string, pd ProductData) {
-	filename := fmt.Sprintf("amazon/%s/%s.json", time.Now().Format("2006-01"), id)
+	filename := fmt.Sprintf("amazon/current/%s.json", id)
 	cacheMtx.Lock()
 	cacheList[id] = filename
 	f, err := os.Create(filename)
@@ -364,21 +378,25 @@ func CacheData(id string, pd ProductData) {
 	}
 }
 
-func RetrieveASIN(id string) ProductData {
+func RetrieveASIN(id string, expiration time.Duration) ProductData {
 	cacheMtx.RLock()
 	if cached, ok := cacheList[id]; ok {
 		cacheMtx.RUnlock()
 		if cached == "missing" {
 			return ProductData{}
 		}
-		f, _ := os.Open(cached)
-		pd := ProductData{}
-		err := json.NewDecoder(f).Decode(&pd)
-		if err != nil {
-			fmt.Println("ID: ", id)
-			log.Fatal("Decode: ", err)
+
+		st, _ := os.Stat(cached)
+		if st != nil && time.Since(st.ModTime()) < expiration {
+			f, _ := os.Open(cached)
+			pd := ProductData{}
+			err := json.NewDecoder(f).Decode(&pd)
+			if err != nil {
+				fmt.Println("ID: ", id)
+				log.Fatal("Decode: ", err)
+			}
+			return pd
 		}
-		return pd
 	}
 	cacheMtx.RUnlock()
 
@@ -401,7 +419,7 @@ func RetrieveASIN(id string) ProductData {
 	CacheData(id, pd)
 	return pd
 }
-func RetrieveGTIN(id string) ProductData {
+func RetrieveGTIN(id string, expiration time.Duration) ProductData {
 	id = strings.TrimSpace(strings.ReplaceAll(id, "-", ""))
 	cacheMtx.RLock()
 	if cached, ok := cacheList[id]; ok {
@@ -409,14 +427,18 @@ func RetrieveGTIN(id string) ProductData {
 		if cached == "missing" {
 			return ProductData{}
 		}
-		f, _ := os.Open(cached)
-		pd := ProductData{}
-		err := json.NewDecoder(f).Decode(&pd)
-		if err != nil {
-			fmt.Println("ID: ", id)
-			log.Fatal("Decode: ", err)
+
+		st, _ := os.Stat(cached)
+		if st != nil && time.Since(st.ModTime()) < expiration {
+			f, _ := os.Open(cached)
+			pd := ProductData{}
+			err := json.NewDecoder(f).Decode(&pd)
+			if err != nil {
+				fmt.Println("ID: ", id)
+				log.Fatal("Decode: ", err)
+			}
+			return pd
 		}
-		return pd
 	}
 	cacheMtx.RUnlock()
 

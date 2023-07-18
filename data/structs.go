@@ -43,6 +43,7 @@ type Series struct {
 	Status            string                 `json:"status"` // Ongoing, Complete, Hiatus, Cancelled
 	AveragePopularity float64                `json:"average_popularity"`
 	Ranking           int                    `json:"ranking"`
+	LNRanking         int                    `json:"ln_ranking"`
 	OriginalLanguage  string                 `json:"original_language"`
 	VersionLanguage   string                 `json:"version_language"`
 	AnnounceDate      string                 `json:"announce_date"`
@@ -89,6 +90,7 @@ type Volume struct {
 	Amazon       AmazonData     `json:"amazon"`
 	Popularity   float64        `json:"popularity"`
 	Ranking      int            `json:"ranking"`
+	LNRanking    int            `json:"ln_ranking"`
 
 	Extra map[string]interface{} `json:"extra,omitempty"`
 }
@@ -495,6 +497,10 @@ func NewPurchaseLink(link string) PurchaseLink {
 		pl.Vendor = "Comic Shop Locator"
 	case strings.Contains(link, "kentai.com"):
 		pl.Vendor = "Kentai Comics"
+	case strings.Contains(link, "waterstones.com"):
+		pl.Vendor = "Waterstones"
+	case strings.Contains(link, "gomanga.com"):
+		pl.Vendor = "GoManga"
 	default:
 		pl.Vendor = "Unknown"
 	}
@@ -506,4 +512,48 @@ func ToLinks(links []string) []PurchaseLink {
 		plinks = append(plinks, NewPurchaseLink(link))
 	}
 	return plinks
+}
+func GenEditData(series []Series) []EditSeries {
+	es := []EditSeries{}
+	for _, s := range series {
+		s2 := EditSeries{
+			Title:     s.Title,
+			Type:      s.Type,
+			Publisher: s.Publisher,
+			ID:        s.ID,
+			Website:   s.Website,
+		}
+		for _, v := range s.Volumes {
+			s2.Volumes = append(s2.Volumes, EditVolume{
+				Title:          v.Title,
+				ID:             v.ID,
+				Website:        v.Website,
+				DigitalRelease: v.DigitalRelease,
+				PrintRelease:   v.PrintRelease,
+			})
+		}
+		es = append(es, s2)
+	}
+	return es
+}
+
+type EditSeries struct {
+	Title     string       `json:"title"`
+	Type      string       `json:"type"`
+	Publisher string       `json:"publisher"`
+	ID        string       `json:"id"`
+	Volumes   []EditVolume `json:"volumes"`
+	Website   string       `json:"website"`
+	Website2  string       `json:"website2"`
+	GetID     string       `json:"get_id"`
+}
+type EditVolume struct {
+	Title          string `json:"title"`
+	Slug           string `json:"slug"`
+	ID             string `json:"id"`
+	Website        string `json:"website"`
+	Website2       string `json:"website2"`
+	GetID          string `json:"get_id"`
+	PrintRelease   string `json:"print_release,omitempty"`
+	DigitalRelease string `json:"digital_release,omitempty"`
 }
